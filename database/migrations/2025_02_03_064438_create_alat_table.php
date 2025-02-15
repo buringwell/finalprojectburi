@@ -20,6 +20,7 @@ return new class extends Migration
             $table->string('alat_deskripsi', 255);
             $table->integer('alat_hargaperhari');
             $table->integer('alat_stok');
+            $table->string('alat_gambar')->nullable();
             $table->timestamps();
         });
     }

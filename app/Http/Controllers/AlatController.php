@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use App\Models\Alat;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
+use Intervention\Image\Facades\Image;
 use Exception;
 
 class AlatController extends Controller
@@ -13,47 +15,46 @@ class AlatController extends Controller
     public function index()
     {
         try {
-            $cachekey = 'alat.all';
-            $alat = Cache::remember($cachekey, 60, function () {
-                return Alat::getAllAlat();
+            $cacheKey = 'alat.all';
+            $alat = Cache::remember($cacheKey, 60, function () {
+                return Alat::all();
             });
-            $response = [
+
+            return response()->json([
                 'success' => true,
-                'message' => 'Successfully get alat data.',
+                'message' => 'Successfully retrieved alat data.',
                 'data' => $alat,
-            ];
-            return response()->json($response, 200);
+            ], 200);
         } catch (Exception $error) {
-            $response = [
+            return response()->json([
                 'success' => false,
-                'message' => 'Sorry, there was an error in the internal server.',
+                'message' => 'Internal server error.',
                 'data' => null,
                 'errors' => $error->getMessage(),
-            ];
-            return response()->json($response, 500);
+            ], 500);
         }
     }
 
     public function show($id)
     {
         try {
-            $cachekeyy = 'alat' . $id;
-            $alat = Alat::getAlatById($id);
-                
-            $response = [
+            $cacheKey = 'alat.' . $id;
+            $alat = Cache::remember($cacheKey, 60, function () use ($id) {
+                return Alat::findOrFail($id);
+            });
+
+            return response()->json([
                 'success' => true,
-                'message' => 'Successfully get alat data.',
+                'message' => 'Successfully retrieved alat data.',
                 'data' => $alat,
-            ];
-            return response()->json($response, 200);
+            ], 200);
         } catch (Exception $error) {
-            $response = [
+            return response()->json([
                 'success' => false,
-                'message' => 'Sorry, there was an error in the internal server.',
+                'message' => 'Internal server error.',
                 'data' => null,
                 'errors' => $error->getMessage(),
-            ];
-            return response()->json($response, 500);
+            ], 500);
         }
     }
 
@@ -66,96 +67,137 @@ class AlatController extends Controller
                 'alat_deskripsi' => 'required|string|max:255',
                 'alat_hargaperhari' => 'required|numeric',
                 'alat_stok' => 'required|numeric',
+                'alat_gambar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             ]);
 
             if ($validator->fails()) {
-                $response = [
+                return response()->json([
                     'success' => false,
-                    'message' => 'Failed to create alat data. Please check your data.',
+                    'message' => 'Failed to create alat data. Please check your input.',
                     'data' => null,
                     'errors' => $validator->errors(),
-                ];
-                return response()->json($response, 400);
+                ], 400);
             }
 
-            $alat = Alat::createAlat($validator->validated());
+            // Simpan gambar jika ada
+            $gambarPath = null;
+            if ($request->hasFile('alat_gambar')) {
+                $image = $request->file('alat_gambar');
+                $filename = time() . '.' . $image->getClientOriginalExtension();
+                
+                // Resize & Crop gambar menjadi 600x600 px (1:1)
+                $resizedImage = Image::make($image)
+                    ->fit(600, 600); // Crop otomatis ke 1:1
+        
+                // Simpan gambar ke storage
+                Storage::disk('public')->put("uploads/alat/{$filename}", (string) $resizedImage->encode());
+        
+                $gambarPath = "uploads/alat/{$filename}";
+            }
+
+            $alat = Alat::create([
+                'kategori_id' => $request->kategori_id,
+                'alat_nama' => $request->alat_nama,
+                'alat_deskripsi' => $request->alat_deskripsi,
+                'alat_hargaperhari' => $request->alat_hargaperhari,
+                'alat_stok' => $request->alat_stok,
+                'alat_gambar' => $gambarPath,
+            ]);
+
             Cache::forget('alat.all');
-            $response = [
+
+            return response()->json([
                 'success' => true,
                 'message' => 'Successfully created alat data.',
                 'data' => $alat,
-            ];
-            return response()->json($response, 201);
+            ], 201);
         } catch (Exception $error) {
-            $response = [
+            return response()->json([
                 'success' => false,
-                'message' => 'Sorry, there was an error in the internal server.',
+                'message' => 'Internal server error.',
                 'data' => null,
                 'errors' => $error->getMessage(),
-            ];
-            return response()->json($response, 500);
+            ], 500);
         }
     }
 
     public function update(Request $request, $id)
     {
         try {
+            $alat = Alat::findOrFail($id);
+
             $validator = Validator::make($request->all(), [
                 'kategori_id' => 'required|exists:kategori,id',
                 'alat_nama' => 'required|string|max:150',
                 'alat_deskripsi' => 'required|string|max:255',
                 'alat_hargaperhari' => 'required|numeric',
                 'alat_stok' => 'required|numeric',
+                'alat_gambar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             ]);
 
             if ($validator->fails()) {
-                $response = [
+                return response()->json([
                     'success' => false,
-                    'message' => 'Failed to update alat data. Please check your data.',
+                    'message' => 'Failed to update alat data. Please check your input.',
                     'data' => null,
                     'errors' => $validator->errors(),
-                ];
-                return response()->json($response, 400);
+                ], 400);
             }
 
-            $alat = Alat::updateAlat($id, $validator->validated());
-            cacehCache::forget('alat.all');
-            $response = [
+            // Jika ada gambar baru, hapus gambar lama dan simpan gambar baru
+            if ($request->hasFile('alat_gambar')) {
+                if ($alat->alat_gambar) {
+                    Storage::disk('public')->delete($alat->alat_gambar);
+                }
+
+                $alat->alat_gambar = $request->file('alat_gambar')->store('uploads/alat', 'public');
+            }
+
+            $alat->update($validator->validated());
+
+            Cache::forget('alat.all');
+            Cache::forget('alat.' . $id);
+
+            return response()->json([
                 'success' => true,
                 'message' => 'Successfully updated alat data.',
                 'data' => $alat,
-            ];
-            return response()->json($response, 200);
+            ], 200);
         } catch (Exception $error) {
-            $response = [
+            return response()->json([
                 'success' => false,
-                'message' => 'Sorry, there was an error in the internal server.',
+                'message' => 'Internal server error.',
                 'data' => null,
                 'errors' => $error->getMessage(),
-            ];
-            return response()->json($response, 500);
+            ], 500);
         }
     }
 
     public function destroy($id)
     {
         try {
-            $alat = Alat::deleteAlat($id);
+            $alat = Alat::findOrFail($id);
+
+            // Hapus gambar jika ada
+            if ($alat->alat_gambar) {
+                Storage::disk('public')->delete($alat->alat_gambar);
+            }
+
+            $alat->delete();
+
             Cache::forget('alat.all');
-            $response = [
+            Cache::forget('alat.' . $id);
+
+            return response()->json([
                 'success' => true,
                 'message' => 'Successfully deleted alat data.',
-                'data' => $alat,
-            ];
-            return response()->json($response, 200);
+            ], 200);
         } catch (Exception $error) {
-            $response = [
+            return response()->json([
                 'success' => false,
-                'message' => 'Sorry, there was an error in the internal server.',
-                'data' => null,
+                'message' => 'Internal server error.',
                 'errors' => $error->getMessage(),
-            ];
-            return response()->json($response, 500);
+            ], 500);
         }
     }
 }

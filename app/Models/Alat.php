@@ -17,6 +17,7 @@ class Alat extends Model
         'alat_deskripsi',
         'alat_hargaperhari',
         'alat_stok',
+        'alat_gambar',
     ];
 
     // Relasi many-to-one dengan tabel kategori
