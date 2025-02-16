@@ -58,6 +58,41 @@ class AlatController extends Controller
         }
     }
 
+    public function showImage($id)
+    {
+        try {
+            $alat = Alat::findOrFail($id);
+    
+            if (!$alat->alat_gambar) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Image not found in database.'
+                ], 404);
+            }
+    
+            $path = storage_path('app/public/' . $alat->alat_gambar);
+    
+            // Debugging: Cek apakah file benar-benar ada
+            if (!file_exists($path)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Image file not found in storage.',
+                    'path_checked' => $path
+                ], 404);
+            }
+    
+            return response()->file($path);
+        } catch (Exception $error) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error retrieving image.',
+                'errors' => $error->getMessage()
+            ], 500);
+        }
+    }
+    
+    
+
     public function store(Request $request)
     {
         try {

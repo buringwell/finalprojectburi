@@ -10,6 +10,7 @@ use App\Http\Controllers\AlatController;
 use App\Http\Controllers\PenyewaanController;
 use App\Http\Controllers\PenyewaanDetailController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ImageController;
 
 /*
 |--------------------------------------------------------------------------
@@ -37,12 +38,12 @@ Route::prefix('auth')->group(function () {
 
 // Route yang memerlukan autentikasi
 Route::middleware('auth:api')->group(function () {
-
+    
     Route::get('/me', [AuthController::class, 'me']); // Get user data
     Route::post('/logout', [AuthController::class, 'logout']); // Logout
     Route::delete('/delete', [AuthController::class, 'destroy']); // Delete account
     Route::post('/auth/refresh', [AuthController::class, 'refresh']);// Route untuk refresh
-
+    
     // Route untuk pelanggan
     Route::prefix('/v1/pelanggan')->middleware('api')->group(function () {
         Route::get('/', [PelangganController::class, 'index']);
@@ -51,7 +52,7 @@ Route::middleware('auth:api')->group(function () {
         Route::put('/{id}', [PelangganController::class, 'update']);
         Route::delete('/{id}', [PelangganController::class, 'destroy']);
     });
-
+    
     //pelanggandetail
     Route::prefix('/v1/data/pelanggan')->middleware('api')->group(function (){
         Route::get("/",[PelangganDataController::class, 'index']);
@@ -60,7 +61,7 @@ Route::middleware('auth:api')->group(function () {
         Route::put("/{id}",[PelangganDataController::class, 'update']);
         Route::delete("/{id}",[PelangganDataController::class, 'destroy']);
     });
-
+    
     // Route untuk admin
     Route::prefix('/v1/admin')->group(function () {
         Route::get('/', [AdminController::class, 'index']);
@@ -69,9 +70,9 @@ Route::middleware('auth:api')->group(function () {
         Route::put('/{id}', [AdminController::class, 'update']);
         Route::delete('/{id}', [AdminController::class, 'destroy']);
         Route::put('/up/{id}', [AdminController::class, 'update_pass']);
-
+        
     });
-
+    
     // Route untuk kategori
     Route::prefix('/v1/kategori')->group(function () {
         Route::get('/', [KategoriController::class, 'index']);
@@ -80,7 +81,7 @@ Route::middleware('auth:api')->group(function () {
         Route::put('/{id}', [KategoriController::class, 'update']);
         Route::delete('/{id}', [KategoriController::class, 'destroy']);
     });
-
+    
     // Route untuk alat
     Route::prefix('/v1/alat')->group(function () {
         Route::get('/', [AlatController::class, 'index']);
@@ -88,6 +89,8 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/', [AlatController::class, 'store']);
         Route::put('/{id}', [AlatController::class, 'update']);
         Route::delete('/{id}', [AlatController::class, 'destroy']);
+        Route::get('/image/{id}', [AlatController::class, 'showImage']); 
+        
     });
 
     // Route untuk penyewaan
