@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\PenyewaanDetail;
+use App\Models\Penyewaan;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Cache;
+use App\Models\Alat;
 use Exception;
 
 class PenyewaanDetailController extends Controller
@@ -60,38 +62,78 @@ class PenyewaanDetailController extends Controller
             $validator = Validator::make($request->all(), [
                 'penyewaan_id' => 'required|exists:penyewaan,id',
                 'alat_id' => 'required|exists:alat,id',
-                'penyewaan_detail_jumlah' => 'required|numeric',
-                'penyewaan_detail_subharga' => 'required|numeric',
+                'penyewaan_detail_jumlah' => 'required|numeric|min:1',
             ]);
-
+    
             if ($validator->fails()) {
-                $response = [
+                return response()->json([
                     'success' => false,
                     'message' => 'Failed to create penyewaan detail data. Please check your data.',
                     'data' => null,
                     'errors' => $validator->errors(),
-                ];
-                return response()->json($response, 400);
+                ], 400);
             }
-
-            $penyewaanDetail = PenyewaanDetail::createPenyewaanDetail($validator->validated());
+    
+            // Ambil data alat berdasarkan ID
+            $alat = Alat::findOrFail($request->alat_id);
+    
+            // Periksa apakah stok cukup
+            if ($alat->alat_stok < $request->penyewaan_detail_jumlah) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Stock is not enough for this rental.',
+                    'data' => null,
+                    'errors' => ['stok' => 'Stok tidak mencukupi.'],
+                ], 400);
+            }
+    
+            // Ambil data penyewaan untuk mendapatkan tanggal sewa dan kembali
+            $penyewaan = Penyewaan::findOrFail($request->penyewaan_id);
+    
+            // Hitung jumlah hari penyewaan
+            $tglSewa = \Carbon\Carbon::parse($penyewaan->penyewaan_tglsewa);
+            $tglKembali = \Carbon\Carbon::parse($penyewaan->penyewaan_tglkembali);
+            $jumlahHari = $tglKembali->diffInDays($tglSewa); // Selisih hari
+    
+            // Hitung subharga: jumlah alat * harga per hari * jumlah hari
+            $totalsubharga = $request->penyewaan_detail_jumlah * $alat->alat_hargaperhari * $jumlahHari;
+    
+            // Kurangi stok alat
+            $alat->alat_stok -= $request->penyewaan_detail_jumlah;
+            $alat->save();
+    
+            // Simpan detail penyewaan
+            $penyewaanDetail = PenyewaanDetail::create([
+                'penyewaan_id' => $request->penyewaan_id,
+                'alat_id' => $request->alat_id,
+                'penyewaan_detail_jumlah' => $request->penyewaan_detail_jumlah,
+                'penyewaan_detail_subharga' => $totalsubharga,
+            ]);
+    
+            // Update total harga penyewaan
+            $totalHarga = PenyewaanDetail::where('penyewaan_id', $request->penyewaan_id)->sum('penyewaan_detail_subharga');
+            Penyewaan::where('id', $request->penyewaan_id)->update(['penyewaan_totalharga' => $totalHarga]);
+    
+            // Hapus cache jika ada
             Cache::forget('penyewaandetail.all');
-            $response = [
+    
+            return response()->json([
                 'success' => true,
                 'message' => 'Successfully created penyewaan detail data.',
                 'data' => $penyewaanDetail,
-            ];
-            return response()->json($response, 201);
+            ], 201);
         } catch (Exception $error) {
-            $response = [
+            return response()->json([
                 'success' => false,
                 'message' => 'Sorry, there was an error in the internal server.',
                 'data' => null,
                 'errors' => $error->getMessage(),
-            ];
-            return response()->json($response, 500);
+            ], 500);
         }
     }
+    
+    
+    
 
     public function update(Request $request, $id)
     {

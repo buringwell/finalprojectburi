@@ -15,11 +15,20 @@ class AlatController extends Controller
     public function index()
     {
         try {
-            $cacheKey = 'alat.all';
-            $alat = Cache::remember($cacheKey, 60, function () {
-                return Alat::all();
+            $query = $request->input('query');
+            $cacheKey = 'alat.all' . ($query ? ".search.{$query}" : '');
+    
+            $alat = Cache::remember($cacheKey, 60, function () use ($query) {
+                $alatQuery = Alat::query();
+                
+                if ($query) {
+                    $alatQuery->where('alat_nama', 'LIKE', "%{$query}%")
+                              ->orWhere('alat_kategori', 'LIKE', "%{$query}%");
+                }
+    
+                return $alatQuery->get();
             });
-
+    
             return response()->json([
                 'success' => true,
                 'message' => 'Successfully retrieved alat data.',

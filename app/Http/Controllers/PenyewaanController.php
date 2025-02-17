@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Penyewaan;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Cache;
+use App\Models\Alat;
 use Exception;
 
 class PenyewaanController extends Controller
@@ -13,23 +14,33 @@ class PenyewaanController extends Controller
     public function index()
     {
         try {
-            $penyewaan = Cache::remember('penyewaan.all', 60, function () {
-                return Penyewaan::getAllPenyewaan();
+            $query = $request->input('query');
+            $cacheKey = 'penyewaan.all' . ($query ? ".search.{$query}" : '');
+    
+            $penyewaan = Cache::remember($cacheKey, 60, function () use ($query) {
+                $penyewaanQuery = Penyewaan::query();
+    
+                if ($query) {
+                    $penyewaanQuery->where('penyewaan_tglsewa', 'LIKE', "%{$query}%")
+                                   ->orWhere('penyewaan_tglkembali', 'LIKE', "%{$query}%")
+                                   ->orWhere('penyewaan_stspembayaran', 'LIKE', "%{$query}%");
+                }
+    
+                return $penyewaanQuery->get();
             });
-            $response = [
+    
+            return response()->json([
                 'success' => true,
-                'message' => 'Successfully get penyewaan data.',
+                'message' => 'Successfully retrieved penyewaan data.',
                 'data' => $penyewaan,
-            ];
-            return response()->json($response, 200);
+            ], 200);
         } catch (Exception $error) {
-            $response = [
+            return response()->json([
                 'success' => false,
-                'message' => 'Sorry, there was an error in the internal server.',
+                'message' => 'Internal server error.',
                 'data' => null,
                 'errors' => $error->getMessage(),
-            ];
-            return response()->json($response, 500);
+            ], 500);
         }
     }
 
@@ -63,7 +74,7 @@ class PenyewaanController extends Controller
                 'penyewaan_tglkembali' => 'required|date',
                 'penyewaan_stspembayaran' => 'required|in:Lunas,Belum Dibayar,DP',
                 'penyewaan_sttskembali' => 'required|in:Sudah Kembali,Belum Kembali',
-                'penyewaan_totalharga' => 'required|numeric',
+              
             ]);
 
             if ($validator->fails()) {
@@ -76,14 +87,18 @@ class PenyewaanController extends Controller
                 return response()->json($response, 400);
             }
 
-            $penyewaan = Penyewaan::createPenyewaan($validator->validated());
+            $penyewaan = Penyewaan::create([
+                'pelanggan_id' => $request->pelanggan_id,
+                'penyewaan_tglsewa' => $request->penyewaan_tglsewa,
+                'penyewaan_tglkembali' => $request->penyewaan_tglkembali,
+                'penyewaan_stspembayaran' => $request->penyewaan_stspembayaran,
+                'penyewaan_sttskembali' => $request->penyewaan_sttskembali,
+                'penyewaan_totalharga' => 0, // sementara diisi 0, nanti akan diupdate
+            ]);
+
             Cache::forget('penyewaan.all');
-            $response = [
-                'success' => true,
-                'message' => 'Successfully created penyewaan data.',
-                'data' => $penyewaan,
-            ];
-            return response()->json($response, 201);
+
+            return response()->json($penyewaan, 201);
         } catch (Exception $error) {
             $response = [
                 'success' => false,

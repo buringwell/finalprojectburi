@@ -10,29 +10,41 @@ use Exception;
 
 class KategoriController extends Controller
 {
-    public function index()
+    
+    public function index(Request $request)
     {
         try {
-            $cachekey = 'kategori.all';
-            $kategori = Cache::remember( $cachekey, 60, function () {
-                return Kategori::getAllKategori();
+            $query = $request->input('search');
+            $cacheKey = 'kategori.all' . ($query ? ".search.{$query}" : '');
+    
+            // Cek cache terlebih dahulu
+            $kategori = Cache::remember($cacheKey, 60, function () use ($query) {
+                $kategoriQuery = Kategori::query();
+                
+                // Jika ada parameter pencarian, tambahkan filter
+                if ($query) {
+                    $kategoriQuery->where('id', 'LIKE', "%{$query}%")
+                                  ->orWhere('kategori_nama', 'LIKE', "%{$query}%");
+                }
+    
+                return $kategoriQuery->get();
             });
-            $response = [
+    
+            return response()->json([
                 'success' => true,
-                'message' => 'Successfully get kategori data.',
+                'message' => 'Successfully retrieved kategori data.',
                 'data' => $kategori,
-            ];
-            return response()->json($response, 200);
+            ], 200);
         } catch (Exception $error) {
-            $response = [
+            return response()->json([
                 'success' => false,
                 'message' => 'Sorry, there was an error in the internal server.',
                 'data' => null,
                 'errors' => $error->getMessage(),
-            ];
-            return response()->json($response, 500);
+            ], 500);
         }
     }
+    
 
 
     public function show($id)
