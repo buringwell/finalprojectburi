@@ -172,6 +172,7 @@ class PenyewaanDetailController extends Controller
                     'errors' => ['stok' => 'Stok tidak mencukupi.'],
                 ], 400);
             }
+            
     
             // Update stok alat berdasarkan perubahan jumlah
             if ($perubahanJumlah > 0) {
