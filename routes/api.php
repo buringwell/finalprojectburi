@@ -35,18 +35,12 @@ Route::prefix('auth')->group(function () {
     Route::post('/passnew',[AuthController::class,'update_pass']);
 });
 
-Route::get('/v1/pelanggan', [PelangganController::class, 'index']);
-Route::get('/v1/pelanggan/{id}', [PelangganController::class, 'show']);
-Route::get("/v1/data/pelanggan",[PelangganDataController::class, 'index']);
-Route::get("/v1/data/pelanggan/{id}",[PelangganDataController::class, 'show']);
+
 Route::get('/v1/kategori', [KategoriController::class, 'index']);
 Route::get('/v1/kategori/{id}', [KategoriController::class, 'show']);
 Route::get('/v1/alat', [AlatController::class, 'index']);
 Route::get('/v1/alat/{id}', [AlatController::class, 'show']);
-Route::get('/v1/penyewaan', [PenyewaanController::class, 'index']);
-Route::get('/v1/penyewaan/{id}', [PenyewaanController::class, 'show']);
-Route::get('/v1/detail/penyewaan', [PenyewaanDetailController::class, 'index']);
-Route::get('/v1/detail/penyewaan/{id}', [PenyewaanDetailController::class, 'show']);
+
 
 // Route yang memerlukan autentikasi
 Route::middleware('auth:api')->group(function () {
@@ -61,10 +55,14 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/', [PelangganController::class, 'store']);
         Route::put('/{id}', [PelangganController::class, 'update']);
         Route::delete('/{id}', [PelangganController::class, 'destroy']);
+        Route::get('/', [PelangganController::class, 'index']);
+        Route::get('/{id}', [PelangganController::class, 'show']);
     });
     
     //pelanggandetail
     Route::prefix('/v1/data/pelanggan')->middleware('api')->group(function (){
+        Route::get("/",[PelangganDataController::class, 'index']);
+        Route::get("/{id}",[PelangganDataController::class, 'show']);
         Route::post("/",[PelangganDataController::class, 'store']);
         Route::put("/{id}",[PelangganDataController::class, 'update']);
         Route::delete("/{id}",[PelangganDataController::class, 'destroy']);
@@ -101,6 +99,8 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/', [PenyewaanController::class, 'store']);
         Route::put('/{id}', [PenyewaanController::class, 'update']);
         Route::delete('/{id}', [PenyewaanController::class, 'destroy']);
+        Route::get('/', [PenyewaanController::class, 'index']);
+        Route::get('/{id}', [PenyewaanController::class, 'show']);
     });
 
     // Route untuk penyewaan detail
@@ -108,5 +108,7 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/', [PenyewaanDetailController::class, 'store']);
         Route::put('/{id}', [PenyewaanDetailController::class, 'update']);
         Route::delete('/{id}', [PenyewaanDetailController::class, 'destroy']);
+        Route::get('/', [PenyewaanDetailController::class, 'index']);
+        Route::get('/{id}', [PenyewaanDetailController::class, 'show']);
     });
 });
