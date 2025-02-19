@@ -12,10 +12,10 @@ use Exception;
 
 class AlatController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         try {
-            $query = $request->input('query');
+            $query = $request->input('search');
             $cacheKey = 'alat.all' . ($query ? ".search.{$query}" : '');
     
             $alat = Cache::remember($cacheKey, 60, function () use ($query) {
@@ -23,7 +23,7 @@ class AlatController extends Controller
                 
                 if ($query) {
                     $alatQuery->where('alat_nama', 'LIKE', "%{$query}%")
-                              ->orWhere('alat_kategori', 'LIKE', "%{$query}%");
+                              ->orWhere('kategori_id', 'LIKE', "%{$query}%");
                 }
     
                 return $alatQuery->get();
@@ -66,41 +66,48 @@ class AlatController extends Controller
             ], 500);
         }
     }
-
-    public function showImage($id)
+    public function updateImage(Request $request, $id)
     {
+        
         try {
+            // Validasi input
+            $request->validate([
+                'alat_gambar' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048', // Validasi gambar
+            ]);
+            
+            // Temukan model Alat berdasarkan ID
             $alat = Alat::findOrFail($id);
     
-            if (!$alat->alat_gambar) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Image not found in database.'
-                ], 404);
+            // Simpan gambar baru
+            $path = $request->file('alat_gambar')->store('images', 'public'); // Simpan di 'public/images'
+            $filename = basename($path); // Ambil nama file dari path
+    
+            // Hapus gambar lama jika ada
+            if ($alat->alat_gambar) {
+                // Hapus gambar lama dari storage
+                $oldImagePath = 'public/images/' . $alat->alat_gambar;
+                if (Storage::exists($oldImagePath)) {
+                    Storage::delete($oldImagePath);
+                }
             }
+            \Log::info('Old image path: ' . $oldImagePath);
+            // Perbarui database
+            $alat->alat_gambar = $filename;
+            $alat->save();
     
-            $path = storage_path('app/public/' . $alat->alat_gambar);
-    
-            // Debugging: Cek apakah file benar-benar ada
-            if (!file_exists($path)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Image file not found in storage.',
-                    'path_checked' => $path
-                ], 404);
-            }
-    
-            return response()->file($path);
-        } catch (Exception $error) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Image updated successfully.',
+                'image_path' => asset('storage/images/' . $filename)
+            ], 200);
+        } catch (\Exception $error) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error retrieving image.',
+                'message' => 'Error updating image.',
                 'errors' => $error->getMessage()
             ], 500);
         }
     }
-    
-    
 
     public function store(Request $request)
     {
@@ -169,50 +176,56 @@ class AlatController extends Controller
     {
         try {
             $alat = Alat::findOrFail($id);
-
+    
+            // Validasi data
             $validator = Validator::make($request->all(), [
                 'kategori_id' => 'required|exists:kategori,id',
                 'alat_nama' => 'required|string|max:150',
                 'alat_deskripsi' => 'required|string|max:255',
                 'alat_hargaperhari' => 'required|numeric',
                 'alat_stok' => 'required|numeric',
-                'alat_gambar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+                'alat_gambar' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
             ]);
-
+    
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Failed to update alat data. Please check your input.',
-                    'data' => null,
+                    'message' => 'Validation error',
                     'errors' => $validator->errors(),
                 ], 400);
             }
-
-            // Jika ada gambar baru, hapus gambar lama dan simpan gambar baru
+    
+            // Handle file upload
             if ($request->hasFile('alat_gambar')) {
+                // Hapus gambar lama jika ada
                 if ($alat->alat_gambar) {
                     Storage::disk('public')->delete($alat->alat_gambar);
                 }
-
-                $alat->alat_gambar = $request->file('alat_gambar')->store('uploads/alat', 'public');
+    
+                // Simpan gambar baru
+                $path = $request->file('alat_gambar')->store('uploads/alat', 'public');
+                $alat->alat_gambar = $path;
             }
-
-            $alat->update($validator->validated());
-
-            Cache::forget('alat.all');
-            Cache::forget('alat.' . $id);
-
+    
+            // Update data
+            $alat->update([
+                'kategori_id' => $request->kategori_id,
+                'alat_nama' => $request->alat_nama,
+                'alat_deskripsi' => $request->alat_deskripsi,
+                'alat_hargaperhari' => $request->alat_hargaperhari,
+                'alat_stok' => $request->alat_stok,
+            ]);
+    
             return response()->json([
                 'success' => true,
-                'message' => 'Successfully updated alat data.',
+                'message' => 'Data updated successfully',
                 'data' => $alat,
             ], 200);
         } catch (Exception $error) {
             return response()->json([
                 'success' => false,
-                'message' => 'Internal server error.',
-                'data' => null,
-                'errors' => $error->getMessage(),
+                'message' => 'Internal server error',
+                'error' => $error->getMessage(),
             ], 500);
         }
     }

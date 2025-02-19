@@ -93,8 +93,7 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/', [AlatController::class, 'store']);
         Route::put('/{id}', [AlatController::class, 'update']);
         Route::delete('/{id}', [AlatController::class, 'destroy']);
-        Route::get('/image/{id}', [AlatController::class, 'showImage']); 
-        
+        Route::post('/{id}/image', [AlatController::class, 'updateImage']); 
     });
 
     // Route untuk penyewaan

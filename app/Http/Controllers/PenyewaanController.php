@@ -11,10 +11,10 @@ use Exception;
 
 class PenyewaanController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         try {
-            $query = $request->input('query');
+            $query = $request->input('search');
             $cacheKey = 'penyewaan.all' . ($query ? ".search.{$query}" : '');
     
             $penyewaan = Cache::remember($cacheKey, 60, function () use ($query) {
@@ -113,13 +113,14 @@ class PenyewaanController extends Controller
     public function update(Request $request, $id)
     {
         try {
-            $validator = Validator::make($request->all(), [
-                'pelanggan_id' => 'required|exists:pelanggan,id',
-                'penyewaan_tglsewa' => 'required|date',
-                'penyewaan_tglkembali' => 'required|date',
-                'penyewaan_stspembayaran' => 'required|in:Lunas,Belum Dibayar,DP',
-                'penyewaan_sttskembali' => 'required|in:Sudah Kembali,Belum Kembali',
-                'penyewaan_totalharga' => 'required|numeric',
+            $validator = Validator::make($request->all(), 
+                [
+                    'pelanggan_id' => $request->pelanggan_id,
+                    'penyewaan_tglsewa' => $request->penyewaan_tglsewa,
+                    'penyewaan_tglkembali' => $request->penyewaan_tglkembali,
+                    'penyewaan_stspembayaran' => $request->penyewaan_stspembayaran,
+                    'penyewaan_sttskembali' => $request->penyewaan_sttskembali,
+                    'penyewaan_totalharga' => 0,
             ]);
 
             if ($validator->fails()) {
@@ -132,7 +133,14 @@ class PenyewaanController extends Controller
                 return response()->json($response, 400);
             }
 
-            $penyewaan = Penyewaan::updatePenyewaan($id, $validator->validated());
+            $penyewaan = Penyewaan::updatePenyewaan($id,  [
+                'pelanggan_id' => $request->pelanggan_id,
+                'penyewaan_tglsewa' => 'required|date',
+                'penyewaan_tglkembali' => 'required|date',
+                'penyewaan_stspembayaran' => 'required|in:Lunas,Belum Dibayar,DP',
+                'penyewaan_sttskembali' => 'required|in:Sudah Kembali,Belum Kembali',
+                'penyewaan_totalharga' => 'required|numeric',
+            ]);
             Cache::forget('penyewaan.all');
             $response = [
                 'success' => true,

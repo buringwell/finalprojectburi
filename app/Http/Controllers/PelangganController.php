@@ -10,10 +10,10 @@ use Exception;
 
 class PelangganController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         try {
-            $query = $request->input('query');
+            $query = $request->input('search');
             $cacheKey = 'pelanggan.all' . ($query ? ".search.{$query}" : '');
     
             $pelanggan = Cache::remember($cacheKey, 60, function () use ($query) {
@@ -22,7 +22,7 @@ class PelangganController extends Controller
                 if ($query) {
                     $pelangganQuery->where('pelanggan_nama', 'LIKE', "%{$query}%")
                                    ->orWhere('pelanggan_email', 'LIKE', "%{$query}%")
-                                   ->orWhere('pelanggan_nohp', 'LIKE', "%{$query}%");
+                                   ->orWhere('pelanggan_notelp', 'LIKE', "%{$query}%");
                 }
     
                 return $pelangganQuery->get();
